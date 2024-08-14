@@ -17,6 +17,7 @@ from matplotlib.lines import Line2D
 import utils
 from scipy.stats import norm
 from random import sample
+import scipy.stats as stats
 
     
 D = 20
@@ -38,6 +39,160 @@ h_onshore = 0.75
 anis = 0.01
 alpha = 0
 kb = 0.1
+
+def plot_3D_field_and_boundary():
+
+    f = plt.figure(figsize=(9.25, 3.5))
+    plt.rcParams.update({'font.size': 8})
+    gs = f.add_gridspec(2, 6, height_ratios=[5, 0.25])
+    ax0 = f.add_subplot(gs[1, :3])
+    ax1 = f.add_subplot(gs[1, 3:])
+    ax2 = f.add_subplot(gs[0, :3], projection='3d')
+    ax3 = f.add_subplot(gs[0, 3:], projection='3d')
+    axs = [ax0, ax1, ax2, ax3]
+
+    H = 20
+    D = 20
+    kb = 0.1
+    x_onshore = 400
+    x_offshore = 4000
+    z_slice = 30
+    x_slice = 2000
+    width = 1000
+    y_slice = 500
+    field = import_field("TSim_Out5", H, 10, D, kb, W=1000)
+    ls = LightSource(270, 35)
+    field = field[0][:int((H + D) / 10), :int(width / 12.5), :]
+    norm = LogNorm(vmin=0.1, vmax=np.max(field))
+    # plot left base
+    x = np.linspace(-x_onshore, x_offshore, int((x_onshore + x_offshore) / 12.5) + 1)
+    z = np.linspace(-z_slice, -H - D, int((H + D - z_slice) / 10) + 1)
+    X, Z = np.meshgrid(x, z)
+    k = field[int(z_slice / 10):, 0, :]
+    colors = cm.coolwarm(norm(k))
+    ax2.plot_surface(X, 0, Z, facecolors=colors, lightsource=ls)
+
+    # plot left upper
+    x = np.linspace(-x_onshore, x_slice, int((x_onshore + x_slice) / 12.5) + 1)
+    z = np.linspace(0, -z_slice, int(z_slice / 10) + 1)
+    X, Z = np.meshgrid(x, z)
+    k = field[:int(z_slice / 10), 0, :int((x_onshore + x_slice) / 12.5)]
+    colors = cm.coolwarm(norm(k))
+    ax2.plot_surface(X, 0, Z, facecolors=colors, lightsource=ls)
+
+    # plot top left
+    x = np.linspace(-x_onshore, x_slice, int((x_onshore + x_slice) / 12.5) + 1)
+    y = np.linspace(0, width, int(width / 12.5) + 1)
+    X, Y = np.meshgrid(x, y)
+    k = field[0, :, :int((x_onshore + x_slice) / 12.5)]
+    colors = cm.coolwarm(norm(k))
+    Z = np.zeros_like(Y)
+    ax2.plot_surface(X, Y, Z, facecolors=colors, lightsource=ls)
+
+    # plot top right
+    x = np.linspace(x_slice, x_offshore, int((x_offshore - x_slice) / 12.5) + 1)
+    y = np.linspace(y_slice, width, int((width - y_slice) / 12.5) + 1)
+    X, Y = np.meshgrid(x, y)
+    k = field[0, int(y_slice / 12.5):, int((x_onshore + x_slice) / 12.5):]
+    colors = cm.coolwarm(norm(k))
+    Z = np.zeros_like(Y)
+    ax2.plot_surface(X, Y, Z, facecolors=colors, lightsource=ls)
+
+    # plot middle left
+    y = np.linspace(0, y_slice, int(y_slice / 12.5) + 1)
+    z = np.linspace(0, -z_slice, int(z_slice / 10) + 1)
+    Y, Z = np.meshgrid(y, z)
+    k = field[:int(z_slice / 10), :int(y_slice / 12.5), int((x_onshore + x_slice) / 12.5) - 2]
+    colors = cm.coolwarm(norm(k))
+    ax2.plot_surface(x_slice, Y, Z, facecolors=colors, lightsource=ls)
+
+    # plot middle right
+    x = np.linspace(x_slice, x_offshore, int((x_offshore - x_slice) / 12.5) + 1)
+    z = np.linspace(0, -z_slice, int(z_slice / 10) + 1)
+    X, Z = np.meshgrid(x, z)
+    k = field[:int(z_slice / 10), int(y_slice / 12.5), int((x_onshore + x_slice) / 12.5):]
+    colors = cm.coolwarm(norm(k))
+    ax2.plot_surface(X, y_slice, Z, facecolors=colors, lightsource=ls)
+
+    # plot middle bottom
+    x = np.linspace(x_slice, x_offshore, int((x_offshore - x_slice) / 12.5) + 1)
+    y = np.linspace(0, y_slice, int(y_slice / 12.5) + 1)
+    X, Y = np.meshgrid(x, y)
+    k = field[int(z_slice / 12.5), :int(y_slice / 12.5), int((x_onshore + x_slice) / 12.5):]
+    colors = cm.coolwarm(norm(k))
+    Z = -(z_slice) * np.ones_like(Y)
+    ax2.plot_surface(X, Y, Z, facecolors=colors, lightsource=ls)
+
+    # plot right base
+    y = np.linspace(0, width, int(width / 12.5) + 1)
+    z = np.linspace(-z_slice, -H - D, int((H + D - z_slice) / 10) + 1)
+    Y, Z = np.meshgrid(y, z)
+    k = field[int(z_slice / 10):, :, -1]
+    colors = cm.coolwarm(norm(k))
+    ax2.plot_surface(x_offshore, Y, Z, facecolors=colors, lightsource=ls)
+
+    # plot right upper
+    y = np.linspace(y_slice, width, int((width - y_slice) / 12.5) + 1)
+    z = np.linspace(0, -z_slice, int(z_slice / 10) + 1)
+    Y, Z = np.meshgrid(y, z)
+    k = field[:int(z_slice / 10), int(y_slice / 12.5):, -1]
+    colors = cm.coolwarm(norm(k))
+    ax2.plot_surface(x_offshore, Y, Z, facecolors=colors, lightsource=ls)
+
+    ax2.set_xlabel("Distance offshore [m]", labelpad=10.0)
+    ax2.set_ylabel("Distance alongshore [m]", labelpad=5.0)
+    ax2.set_zlabel("Depth [m]")
+    ax2.set_box_aspect((1, 0.8, 0.2))
+    ax2.set_zticks([0, -20, -40])
+    ax2.set_yticks([0, 500, 1000])
+    ax2.set_xticks([0, 1000, 2000, 3000, 4000])
+    facies_values = np.sort(np.unique(field), axis=None)
+    facies0 = mpatches.Patch(color=cm.coolwarm(norm(facies_values[3])), label='facies 1')
+    facies1 = mpatches.Patch(color=cm.coolwarm(norm(facies_values[2])), label='facies 2')
+    facies2 = mpatches.Patch(color=cm.coolwarm(norm(facies_values[1])), label='facies 3')
+    aquitard = mpatches.Patch(color=cm.coolwarm(norm(facies_values[0])), label='aquitard')
+    axs[0].legend(handles=[facies0, facies1, facies2, aquitard], ncol=4, loc="upper center")
+
+    x = np.array([-400, 4000])
+    y = np.array([0, 1000])
+    X, Y = np.meshgrid(x, y)
+
+    axs[3].plot_wireframe(X, Y, 0*np.ones_like(X), colors='black', lw=0.5)
+    axs[3].plot_wireframe(X, Y, -20 * np.ones_like(X), colors='black', lw=0.5)
+    axs[3].plot_wireframe(X, Y, -40 * np.ones_like(X), colors='black', lw=0.5)
+
+    z = np.array([0, -40])
+    X, Z = np.meshgrid(x, z)
+
+    axs[3].plot_wireframe(X, 0*np.ones_like(X), Z, colors='black', lw=0.5)
+    axs[3].plot_wireframe(X, 1000*np.ones_like(X), Z, colors='black', lw=0.5)
+
+    # boundarys
+    Y, Z = np.meshgrid(y, z)
+    offshore = axs[3].plot_surface(4000, Y, Z, color=cm.viridis(1.0), alpha=0.5, lightsource=ls, label="offshore boundary")
+    Y, Z = np.meshgrid(y, np.array([-20, -40]))
+    onshore = axs[3].plot_surface(-400, Y, Z, color=cm.viridis(0.0), alpha=0.5, lightsource=ls, label="onshore boundary")
+    X, Y = np.meshgrid(np.array([0, 4000]), y)
+    axs[3].plot_surface(X, Y, 0*np.ones_like(X), color=cm.viridis(1.0), alpha=0.5, lightsource=ls)
+    axs[3].text(1000, 0, -17.5, "Aquitard", "x", va="center")
+    axs[3].text(1000, 0, -37.5, "Aquifer", "x", va="center")
+
+    axs[1].legend(handles=[onshore, offshore], ncol=2, loc='upper center')
+
+    axs[3].set_xlabel("Distance offshore [m]", labelpad=10.0)
+    axs[3].set_ylabel("Distance alongshore [m]", labelpad=5.0)
+    axs[3].set_zlabel("Depth [m]")
+    axs[3].set_box_aspect((1, 0.8, 0.2))
+    axs[3].set_zticks([0, -20, -40])
+    axs[3].set_yticks([0, 500, 1000])
+    axs[3].set_xticks([0, 1000, 2000, 3000, 4000])
+
+    axs[0].axis("off")
+    axs[1].axis("off")
+
+    f.set_constrained_layout(True)
+    f.savefig(f'/home/superuser/objective_2/results/model_setup.png', dpi=600)
+
 
 def plot_3D_plume(name, i, results=False):
     D = 20
@@ -107,10 +262,59 @@ def plot_3D_plume(name, i, results=False):
     plt.colorbar(m, ax=ax, location="left", label=r"C [PSU]", shrink=0.75)
     plt.savefig(f'/home/superuser/objective_2/collated_outputs/{name}_collated.png', dpi=600)
 
+def plot_3D_plume_before_and_after(name):
+    pre_conc, _, _, _, _ = modelling.get_last_results(name)
+    post_conc, _, _, _, _ = modelling.get_last_results(f"{name}_")
+
+    f = plt.figure(figsize=(9, 3.5))
+    plt.rcParams.update({'font.size': 8})
+    gs = f.add_gridspec(2, 6, height_ratios=[5, 0.25])
+    ax0 = f.add_subplot(gs[1, 2:4])
+    ax1 = f.add_subplot(gs[0, :3], projection='3d')
+    ax2 = f.add_subplot(gs[0, 3:], projection='3d')
+    axs = [ax0, ax1, ax2]
+    #
+    ls = LightSource(0, 35)
+
+    x = np.linspace(-400, 4000, 352)
+    y = np.linspace(0, 1000, 80)
+    z = np.linspace(0, -40, 16)
+    levels = [0.35, 3.5, 17.75]
+    X, Z = np.meshgrid(x, z)
+    slices = 3
+
+    viridis = mpl.colormaps['viridis']
+    for i in range(slices):
+        m = axs[1].plot_surface(X, i * W / (slices - 1), Z, lightsource=ls,
+                            facecolors=viridis(pre_conc[:, int(np.floor(i * 79 / (slices - 1))), :]))
+
+    viridis = mpl.colormaps['viridis']
+    for i in range(slices):
+        m1 = axs[2].plot_surface(X, i * W / (slices - 1), Z, lightsource=ls,
+                            facecolors=viridis(post_conc[:, int(np.floor(i * 79 / (slices - 1))), :]))
+
+    for ax in axs[1:]:
+        ax.set_xlabel("Distance offshore [m]", labelpad=10.0)
+        ax.set_ylabel("Distance alongshore [m]", labelpad=5.0)
+        ax.set_zlabel("Depth [m]")
+        ax.set_box_aspect((1, 0.8, 0.2))
+        ax.set_zticks([0, -20, -40])
+        ax.set_yticks([0, 500, 1000])
+        ax.set_xticks([0, 1000, 2000, 3000, 4000])
+        ax.set_xlim(-400, 4000)
+
+    norm = Normalize(vmin=0, vmax=35)
+    m = cm.ScalarMappable(cmap=cm.viridis, norm=norm)
+    f.colorbar(m, cax=axs[0], location='bottom', label=r"C [PSU]", shrink=0.25)
+    f.set_constrained_layout(True)
+    # f.show()
+    f.savefig(f'/home/superuser/objective_2/results/salinity_before_after_{name}.png', dpi=600)
+
 def plot_all_plumes(name):
-    finished_index = np.load(f'//collated_outputs/{name}_transient_collated_index.npy')
+    finished_index = np.load(f'collated_outputs/{name}_transient_collated_index.npy')
     for idx, real in enumerate([f"{name}{i}" for i in finished_index]):
-        plot_3D_plume(f"{name}", finished_index[idx], results='transient')
+        # plot_3D_plume(f"{name}", finished_index[idx], results='transient')
+        plot_3D_plume_before_and_after(real)
 
 def plot_one_model(name, results=None):
 
@@ -166,6 +370,38 @@ def plot_one_model(name, results=None):
             f.set_constrained_layout(True)
             plt.show()
             # plt.savefig(f"/home/superuser/objective_2/results/{name}_row{row}_final_step.png", dpi=600)
+
+def plot_2D_model_steady(name):
+
+    conc, head, qx, qy, qz = modelling.get_last_results(name)
+    f, axs = plt.subplots(1, 2, figsize=(4, 6), layout="constrained", sharex=True, sharey=True)
+
+    x = np.linspace(-x_onshore, -x_onshore + ncol * delc, ncol) / 1000
+    y = np.linspace(-D - H, 0, nlay)
+    plt.rcParams.update({'font.size': 9})
+
+    for i in range(nlay):
+        for j in range(ncol):
+            if abs(conc[i, 0, j]) == 1.e30:
+                conc[i, 0, j] = np.nan
+                head[i, 0, j] = np.nan
+
+    row = 0
+    hf_pre = proc.hf(conc[:, row, :], head[:, row, :], nlay, 0, delv)
+    qx_pre = qx[::-10, row, ::20] / np.sqrt(qx[::-10, row, ::20] ** 2 + np.abs(qz[::-10, row, ::20]) ** 2)
+    qz_pre = qz[::-10, row, ::20] / np.sqrt(qx[::-10, row, ::20] ** 2 + np.abs(qz[::-10, row, ::20]) ** 2)
+    axs[0].pcolormesh(x, y, conc[::-1, row, :], cmap="viridis", vmax=35, vmin=0)
+    axs[0].quiver(x[::20], y[::10], qx_pre / 2, qz_pre / 2, color="red", width=0.002, scale=20)
+    axs[0].set_box_aspect(0.3)
+    head_min = np.nanmin(hf_pre)
+    head_max = np.nanmax(hf_pre)
+    cp0 = axs[-1].contour(x, y, hf_pre[::-1, :], vmin=head_min, vmax=head_max, colors="black", linewidths=0.75)
+    axs[-1].set_box_aspect(0.3)
+    axs[0].set_ylabel("Depth [masl]")
+    axs[-1].clabel(cp0, inline=True, fontsize=7)
+    f.set_constrained_layout(True)
+    plt.savefig(f"/home/superuser/objective_2/results/{name}_2D_final_step.png", dpi=600)
+
 
 def results_0(name, n):
     raise NotImplementedError
@@ -551,16 +787,40 @@ def plot_plan_view_examples(name):
     plt.show()
     pass
 
-def plot_priors():
-    pass
+def plot_priors(name, priors, units, types):
+    """
+
+    :param name: name of 2d model (dispersive or dual porosity)
+    :param priors:
+    :param units:
+    :param types: types of each of the prior distributions
+    """
+    f, axs = plt.subplots(1, len(priors), figsize=(2*len(priors), 1.5))
+    for i, (param, dist) in enumerate(priors.items()):
+
+        if types[i] == 'uniform':
+            vmin = dist.dist.kwds['loc'] - 1
+            vmax = dist.dist.kwds['loc'] + dist.dist.kwds['scale'] + 1
+        elif types[i] == 'norm':
+            vmin = dist.dist.kwds['loc'] - 3*dist.dist.kwds['scale']
+            vmax = dist.dist.kwds['loc'] + 3*dist.dist.kwds['scale']
+
+        sample = np.linspace(vmin, vmax, 1000)
+        axs[i].plot(sample, dist.dist.pdf(sample), color="orange")
+        axs[i].set_ylabel('probability')
+        axs[i].set_xlabel(f'{param}, [log({units[i]})]')
+
+    f.set_constrained_layout(True)
+    plt.savefig(f'/home/superuser/objective_2/results/priors_{name}.png', dpi=600)
 
 def plot_posteriors():
     pass
 
 if __name__=="__main__":
     # pass
+    plot_3D_field_and_boundary()
     # plot_all_plumes("heta03Dc")
     #steady_results_multiplot("heta03Dc")
-   # plot_interface_movement_plan_view("heta03Dc")
-    # transient_results_multi("heta03Dc")
+    #plot_interface_movement_plan_view("heta03Dc")
+    #transient_results_multi("heta03Dc")
     # plot_plan_view_examples("heta03Dc")

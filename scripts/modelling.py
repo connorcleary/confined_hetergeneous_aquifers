@@ -25,7 +25,7 @@ def build_base_model(name, field_name):
     anis = 0.01
     alpha = 0
     kb = 0.1
-    
+
     mf6exe = "/home/superuser/mf6"
     # mf6exe = "C:/Users/ccl124/code/code_cdrive/bin/mf6.exe"
     length_units = "m"
@@ -34,7 +34,7 @@ def build_base_model(name, field_name):
     nouter, ninner = 500, 500
     hclose, rclose, relax = 1e-5, 1e-5, 0.97
 
-    modelname = name 
+    modelname = name
 
     ws = f"./model_files/{name}"
     if not os.path.exists(ws):
@@ -77,7 +77,7 @@ def build_base_model(name, field_name):
     idomain[:, :, -1] = 1
     idomain[0, 0, int(x_onshore/delc):] = 1
 
-    
+
     flopy.mf6.ModflowGwfdis(
         gwf,
         length_units=length_units,
@@ -89,7 +89,7 @@ def build_base_model(name, field_name):
         top=top,
         botm=botm,
         idomain=idomain
-    )    
+    )
     hk, hka, = rf.import_field(field_name, H, delv, D, kb, W, delr, delc=delc)
 
     flopy.mf6.ModflowGwfnpf(
@@ -98,7 +98,7 @@ def build_base_model(name, field_name):
         save_specific_discharge=True,
         icelltype=1,
         k=hk,
-        k33overk=True, 
+        k33overk=True,
         k33=hka,
         rewet_record="REWET WETFCT 1.0 IWETIT 1 IHDWET 0",
         wetdry=1
@@ -116,16 +116,16 @@ def build_base_model(name, field_name):
     ghb_temp = []
     chd_temp = []
 
-    # add onshore boundary 
+    # add onshore boundary
     for lay in range(int(D/delv), int((D+H)/delv)):
         for row in range(nrow):
             chd_temp.append([(lay, row, 0), h_onshore, 0.0])
-    # add vertical 
-    for lay in range(int((D+H)/delv)): 
+    # add vertical
+    for lay in range(int((D+H)/delv)):
         for row in range(nrow):
             cond = hk[lay, row, ncol-1] * delv * delc / (delr)
             ghb_temp.append([(lay, row, ncol-1), 0, cond, 35.0])
-    # add horizontal 
+    # add horizontal
     for col in range(ncol-int(x_onshore/delc), ncol):
         for row in range(nrow):
             cond = hk[0, row, col]*hka[0]* delr * delc / (delv)
@@ -147,7 +147,7 @@ def build_base_model(name, field_name):
         pname="GHB-1",
         auxiliary=["CONCENTRATION"]
     )
-    
+
     ws_results = f"./model_files/{name}"
     if not os.path.exists(ws_results):
         os.makedirs(ws_results)
@@ -166,7 +166,7 @@ def build_base_model(name, field_name):
 
     flopy.mf6.ModflowGwfsto(gwf, ss=1e-6, sy=0.3, iconvert=1, transient=True)
     gwt = flopy.mf6.ModflowGwt(sim, modelname="trans")
-    
+
     imsgwt = flopy.mf6.ModflowIms(
         sim,
         print_option="ALL",
@@ -215,7 +215,7 @@ def build_base_model(name, field_name):
 
     flopy.mf6.ModflowGwtssm(gwt, sources=sourcerecarray)
     saverecord = {0: [("CONCENTRATION", "LAST")]}
-    	
+
     flopy.mf6.ModflowGwtoc(
         gwt,
         budget_filerecord=f"{name}.cbc",
@@ -730,41 +730,6 @@ def get_bulk_conductivities(L, H, W, i):
 
     return hk_eff, hka_eff
 
-def build_dispersive_model(name, K, alpha):
-    D = 20
-    H = 20
-    L = 4400
-    delc = 12.5
-    delv = 2.5
-    nlay = int((D+H)/delv)
-    ncol = int(L/delc)
-    perlen = 1e8
-    nper = 1
-    nstp = 1e5
-    tsmult = 1
-    x_onshore = 400
-    h_onshore = 0.75
-    anis = 0.01
-    kb = 0.1
-    pass
-
-def build_dual_porosity_model(name, K, theta_m, theta_im, xi):
-    D = 20
-    H = 20
-    L = 4400
-    delc = 12.5
-    delv = 2.5
-    nlay = int((D+H)/delv)
-    ncol = int(L/delc)
-    perlen = 1e8
-    nper = 1
-    nstp = 1e5
-    tsmult = 1
-    x_onshore = 400
-    h_onshore = 0.75
-    anis = 0.01
-    kb = 0.1
-    pass
 
 def get_last_results(name):
     ws = f"model_files/{name}"

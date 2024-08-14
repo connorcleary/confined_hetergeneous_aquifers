@@ -11,7 +11,7 @@ fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
 H = 20
 D = 20 
 kb = 0.1
-field = import_field("TSim_Out2", H, 10, D, kb, W=1000)
+field = import_field("TSim_Out5", H, 10, D, kb, W=1000)
 x_onshore = 400
 x_offshore = 4000
 z_slice = 30
