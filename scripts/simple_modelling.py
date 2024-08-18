@@ -1,6 +1,7 @@
 import flopy
 import numpy as np
 import os
+import post_processing as proc
 
 def create_transport_package(name, gwt, type, transport_kwargs, strt_cim=0):
 
@@ -35,7 +36,7 @@ def create_k_data(H, D, ncol, nlay, ka, kb, anis, ka_anis=1):
     hka = [anis for i in range(int(nlay*D/(D+H)))] + [ka_anis for i in range(int(nlay*H/(D+H)))]
     return hk, hka
 
-def build_2D_steady_model(name, type, base_params, transport_kwargs):
+def build_2D_steady_model(dir, name, type, base_params, transport_kwargs):
     D = 20
     H = 20
     L = 4400
@@ -45,9 +46,9 @@ def build_2D_steady_model(name, type, base_params, transport_kwargs):
     nlay = int((D + H) / delv)
     ncol = int(L / delc)
     nrow = 1
-    perlen = 1e7
+    perlen = 1e8
     nper = 1
-    nstp = 1e4
+    nstp = 1e5
     tsmult = 1
     x_onshore = 400
     h_onshore = 0.75
@@ -64,7 +65,7 @@ def build_2D_steady_model(name, type, base_params, transport_kwargs):
 
     modelname = name
 
-    ws = f"./model_files/{name}"
+    ws = str(dir)
     if not os.path.exists(ws):
         os.makedirs(ws)
 
@@ -261,5 +262,24 @@ def build_2D_steady_model(name, type, base_params, transport_kwargs):
 def build_2D_transient_model(name, conc, head, type, base_params, transport_kwargs):
     pass
 
-def get_steady_metrics(dir, name):
-    pass
+def get_steady_metrics_and_arrays(dir, name):
+
+    try:
+        sim = flopy.mf6.MFSimulation.load(
+            sim_ws=str(dir),
+            exe_name="/home/superuser/mf6",
+            verbosity_level=0,
+        )
+        gwf = sim.get_model(name)
+        gwt = sim.get_model("trans")
+        bud = gwf.output.budget()
+        times = bud.get_times()
+        time = times[-1]
+        conc = gwt.output.concentration().get_data(totim=time)
+        toe_mean = proc.find_average_toe_position(conc, 12.5, 400)
+        width_mean = proc.find_average_width(conc, 12.5, int(352), 400)
+        head = gwt.output.head().get_data(totim=time)
+        return toe_mean, width_mean, conc, head
+
+    except:
+        return np.inf, np.inf, np.inf, np.inf

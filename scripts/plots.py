@@ -19,6 +19,13 @@ from scipy.stats import norm
 from random import sample
 import scipy.stats as stats
 
+def get_color_realization(i):
+    if i < 20:
+        return cm.tab20(1/40+1/20*i)
+    else:
+        return cm.tab20b(1/40+1/20*(i-20))
+
+
     
 D = 20
 H = 20
@@ -742,15 +749,14 @@ def transient_results_multi(name):
     f.set_constrained_layout(True)
     f.savefig(f'/home/superuser/objective_2/results/{name}_transient_multiplot.png', dpi=600)
 
-def plot_plan_view_examples(name):
+def plot_plan_view_examples(name, conductivity=False):
     pre = np.load(f'collated_outputs/{name}_collated.npy')
     post = np.load(f'collated_outputs/{name}_transient_collated.npy')
     pre_index = np.load(f'collated_outputs/{name}_collated_index.npy')
     post_index = np.load(f'collated_outputs/{name}_transient_collated_index.npy')
-
     plot = sample(list(post_index), 9)
     cmap = cm.get_cmap('Set1')
-    colors = [cmap(i/9) for i in range(len(plot))]
+    colors = [get_color_realization(i) for i in plot]
     f, axs = plt.subplots(4, 3, figsize=(8, 5), gridspec_kw={'hspace': 0, 'wspace': 0})
     plt.rcParams.update({'font.size': 8})
     for i, idx in enumerate(plot):
@@ -771,6 +777,12 @@ def plot_plan_view_examples(name):
         t = axs[i//3][i%3].text(0.95, 0.85, f'realization {idx}', horizontalalignment='right', verticalalignment='center',
                  transform=axs[i//3][i%3].transAxes)
         t.set_bbox(dict(facecolor='white', alpha=0.5, edgecolor='None'))
+        if conductivity:
+            field = import_field(f"TSim_Out{idx+1}", H, delv, D, kb, W=W, delr=delr, L=4400, delc=12.5)
+            X, Y = np.meshgrid(np.linspace(-400, 4000, ncol), np.linspace(0, 1000, 80))
+            axs[i // 3][i % 3].pcolormesh(X, Y, np.log10(field[0][-1, :, :]),
+                                          cmap='binary', zorder=0, alpha=0.25)
+
 
     patch = mpatches.Patch(color='grey', label='area salinzed', alpha=0.5)
     final = Line2D([0], [0], color="grey", label="final interface")
@@ -784,8 +796,107 @@ def plot_plan_view_examples(name):
     axs[-1][1].axis("off")
     # f.set_constrained_layout(True)
     f.savefig(f'/home/superuser/objective_2/results/{name}_movement_realizations.png', dpi=600)
-    plt.show()
     pass
+
+def plot_break_through_curves(name, distribution=True, n_well=6):
+
+    if distribution is False:
+        wells = np.linspace(100, 900, n_well)
+
+    shoreline = np.load(f'/home/superuser/objective_2/collated_outputs/{name}_average_shoreline_conc5.npy')
+    realizations_salinized = np.argwhere(shoreline > 0.35)
+    indexes = np.unique(realizations_salinized[:, 0])
+    indexes = indexes[:9]
+    finished_index = np.load(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_index.npy')
+    real = finished_index[indexes]
+    cmap = cm.get_cmap('Set1')
+    t = np.linspace(0, 100, 11)
+
+    colors = [get_color_realization(i) for i in real]
+    f, axs = plt.subplots(4, 3, figsize=(8, 5), gridspec_kw={'hspace': 0, 'wspace': 0})
+    plt.rcParams.update({'font.size': 8})
+    axs = axs.flatten()
+    for i, idx in enumerate(indexes):
+        if distribution:
+            axs[i].fill_between(t, np.percentile(shoreline[idx], 0, axis=1), np.percentile(shoreline[idx], 100, axis=1), color=colors[i], alpha=0.25)
+            axs[i].fill_between(t, np.percentile(shoreline[idx], 25, axis=1), np.percentile(shoreline[idx], 75, axis=1), color=colors[i], alpha=0.25)
+            axs[i].plot(t, np.median(shoreline[idx], axis=1), color=colors[i])
+        else:
+            for well in wells:
+                axs[i].plot(t, shoreline[idx, :, int(well/delr)], lw=0.5, color=colors[i])
+
+        axs[i].axhline(0.35, color='black', ls=':', lw=1)
+        # axs[i].set_ylim(0, np.max(shoreline)+0.5)
+
+    for i, idx in enumerate(indexes):
+        axs[i].set_xticklabels([])
+        axs[i].set_yticklabels([])
+        t = axs[i].text(0.05, 0.85, f'realization {real[i]}', horizontalalignment='left',
+                                     verticalalignment='center',
+                                     transform=axs[i].transAxes)
+        t.set_bbox(dict(facecolor='white', alpha=0.5, edgecolor='None'))
+
+    thresh = Line2D([0], [0], color="black", ls=":", label="C = 0.35 PSU")
+    if distribution:
+        patch_outer = mpatches.Patch(color='grey', label='percentiles 0-100', alpha=0.25)
+        patch_inner = mpatches.Patch(color='grey', label='percentiles 25-75', alpha=0.5)
+        median = Line2D([0], [0], color="grey", label="median")
+        axs[-4].legend(handles=[thresh, patch_outer, patch_inner, median], loc='upper right')
+    else:
+        well = Line2D([0], [0], color='grey', label="obs. well")
+        axs[-4].legend(handles=[thresh, well], loc='upper right')
+
+    axs[-4].axis("off")
+    axs[-3].axis("off")
+    axs[-2].axis("off")
+    axs[-1].axis("off")
+    axs[7].set_xlabel("time")
+    axs[3].set_ylabel("onshore boundary salinity")
+    f.savefig(f'/home/superuser/objective_2/results/{name}_break_through_curves_dist={str(distribution)}.png', dpi=600)
+
+def plot_break_through_subplot_per_well(name, n_well=6):
+
+    wells = np.linspace(100, 900, n_well)
+    shoreline = np.load(f'/home/superuser/objective_2/collated_outputs/{name}_average_shoreline_conc5.npy')
+    realizations_salinized = np.argwhere(shoreline > 0.35)
+    indexes = np.unique(realizations_salinized[:, 0])
+    indexes = indexes[:9]
+    finished_index = np.load(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_index.npy')
+    real = finished_index[indexes]
+    t = np.linspace(0, 100, 11)
+    colors = [get_color_realization(i) for i in real]
+    f, axs = plt.subplots(4, 3, figsize=(8, 5), gridspec_kw={'hspace': 0, 'wspace': 0})
+    plt.rcParams.update({'font.size': 8})
+    axs = axs.flatten()
+    for i, well in enumerate(wells):
+        for j, idx in enumerate(indexes):
+            axs[i].plot(t, shoreline[idx, :, int(well/delr)], lw=0.5, color=colors[j])
+        axs[i].axhline(0.35, color='black', ls=':', lw=1)
+
+    for i, well in enumerate(wells):
+        axs[i].set_xticklabels([])
+        axs[i].set_yticklabels([])
+        t = axs[i].text(0.05, 0.85, f'y = {int(well)} m', horizontalalignment='left',
+                        verticalalignment='center',
+                        transform=axs[i].transAxes)
+        t.set_bbox(dict(facecolor='white', alpha=0.5, edgecolor='None'))
+
+    thresh = Line2D([0], [0], color="black", ls=":", lw=0.5, label="C = 0.35 PSU")
+    reals = []
+    for j, idx in enumerate(indexes):
+        reals.append(Line2D([0], [0], lw=0.5, color=colors[j], label=f"realization {idx}"))
+    axs[-4].legend(ncol=2, handles=[thresh]+reals, loc='upper right')
+
+    axs[-6].axis("off")
+    axs[-5].axis("off")
+    axs[-4].axis("off")
+    axs[-3].axis("off")
+    axs[-2].axis("off")
+    axs[-1].axis("off")
+    axs[4].set_xlabel("time")
+    axs[3].set_ylabel("onshore boundary salinity")
+    f.savefig(f'/home/superuser/objective_2/results/{name}_break_through_curves_by_well.png', dpi=600)
+
 
 def plot_priors(name, priors, units, types):
     """
@@ -810,17 +921,47 @@ def plot_priors(name, priors, units, types):
         axs[i].set_ylabel('probability')
         axs[i].set_xlabel(f'{param}, [log({units[i]})]')
 
+
+
     f.set_constrained_layout(True)
     plt.savefig(f'/home/superuser/objective_2/results/priors_{name}.png', dpi=600)
 
-def plot_posteriors():
-    pass
+def plot_posteriors(name, fraction, priors, units, types):
+    params, best = utils.get_n_best(name, fraction)
+    f, axs = plt.subplots(1, len(priors), figsize=(2 * len(priors), 1.5))
+    for i, (param, dist) in enumerate(priors.items()):
+        for i, (param, dist) in enumerate(priors.items()):
+
+            if types[i] == 'uniform':
+                vmin = dist.dist.kwds['loc'] - 1
+                vmax = dist.dist.kwds['loc'] + dist.dist.kwds['scale'] + 1
+            elif types[i] == 'norm':
+                vmin = dist.dist.kwds['loc'] - 3 * dist.dist.kwds['scale']
+                vmax = dist.dist.kwds['loc'] + 3 * dist.dist.kwds['scale']
+
+            sample = np.linspace(vmin, vmax, 1000)
+            axs[i].plot(sample, dist.dist.pdf(sample), color="orange")
+            axs[i].hist(params[:, i], bins=20, histtype='step' ,density=True, color='blue')
+            axs[i].set_ylabel('probability')
+            axs[i].set_xlabel(f'{param}, [log({units[i]})]')
+
+    f.set_constrained_layout(True)
+    plt.savefig(f'/home/superuser/objective_2/results/posteriors_{name}.png', dpi=600)
+
+def plot_log_ps(name):
+    log_ps = np.load(f'/home/superuser/objective_2/dreamz_outputs/{name}/log_ps.npy')
+    plt.plot(log_ps[:, :, 0])
+    plt.savefig(f'/home/superuser/objective_2/results/log_ps_{name}.png', dpi=600)
 
 if __name__=="__main__":
-    # pass
-    plot_3D_field_and_boundary()
+    pass
+    # plot_3D_field_and_boundary()
     # plot_all_plumes("heta03Dc")
     #steady_results_multiplot("heta03Dc")
     #plot_interface_movement_plan_view("heta03Dc")
     #transient_results_multi("heta03Dc")
-    # plot_plan_view_examples("heta03Dc")
+    # plot_plan_view_examples("heta03Dc", True)
+    # plot_break_through_curves("heta03Dc", distribution=False)
+    # plot_break_through_subplot_per_well("heta03Dc")
+    # plot_posteriors('test_dispersive')
+    # plot_posteriors('test_dual')

@@ -2,6 +2,7 @@ import flopy
 import numpy as np
 import modelling
 import post_processing as proc
+from pathlib import Path
 
 D = 20
 H = 20
@@ -34,6 +35,16 @@ def collate_steady_results(name, n):
 
     np.save(f'/home/superuser/objective_2/collated_outputs/{name}_collated.npy', results)
     np.save(f'/home/superuser/objective_2/collated_outputs/{name}_collated_index.npy', finished_index)
+
+
+def collate_steady_interface_cells(name):
+    concs = np.load(f'/home/superuser/objective_2/collated_outputs/{name}_collated.npy')
+    interfaces = []
+    for idx, conc in enumerate(concs):
+        interfaces.append([np.min(np.argmax([conc[:, row, :] >= 0.35], axis=2)) for row in range(conc.shape[1])])
+
+    np.save(f'/home/superuser/objective_2/collated_outputs/{name}_collated_interface_cols.npy', interfaces)
+
 
 def collate_transient_results(name, n):
     results = []
@@ -74,7 +85,20 @@ def find_metrics_over_time(name):
     np.save(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_average_toe.npy', average_toe)
     np.save(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_average_width.npy', average_width)
 
-    
+def collate_shoreline_salinity(name):
+    finished_index = np.load(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_index.npy')
+    results = []
+    for idx in finished_index:
+        conc0 = modelling.get_last_results(f'{name}{idx}')[0]
+        conc = modelling.get_all_conc(f'{name}{idx}_')
+        conc = np.asarray(conc)
+        all_conc = np.concatenate(([conc0], conc), axis=0)[:, :, :, 2]
+        all_conc = np.max(all_conc, axis=1)
+        results.append(all_conc)
+
+    np.save(f'/home/superuser/objective_2/collated_outputs/{name}_average_shoreline_conc5.npy', results)
+
+
 def find_effective_conductivities(name):
 
     H = 20
@@ -105,10 +129,31 @@ def find_steady_description(name):
 def find_metrics_over_time_2D():
     pass
 
+def get_n_best(name, nplot):
+    """
+    Function to get the n best runs from a dreamz output
+    :param name:
+    :param nplot:
+    :return: sampled_params: all the sampled parameters
+    :return: best: the indices of the best n runs
+    """
+    # get the index of the n best runs
+    dreamz_dir = Path(f'/home/superuser/objective_2/dreamz_outputs/{name}/')
+    sampled_params = np.load(dreamz_dir.joinpath('sampled_params.npy'))
+    log_ps = np.load(dreamz_dir.joinpath('log_ps.npy'))
+    log_ps = log_ps.flatten()
+    sampled_params = sampled_params.reshape(len(log_ps), sampled_params.shape[-1])
+    best = np.argsort(log_ps)[-int(nplot*len(log_ps)):]
+
+    return sampled_params[best], best
+
+
 if __name__=="__main__":
     # collate_transient_results('heta03Dc', 30)
     # find_effective_conductivities('heta03Dc')
    # find_toe_position_over_time
    # find_toe_position_over_time
-    find_metrics_over_time('heta03Dc')
+    # find_metrics_over_time('heta03Dc')
     # find_steady_description('heta03Dc')
+    # collate_shoreline_salinity('heta03Dc')
+    collate_steady_interface_cells('heta03Dc')

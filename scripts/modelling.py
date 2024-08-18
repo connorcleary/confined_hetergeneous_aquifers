@@ -234,8 +234,8 @@ def build_base_model(name, field_name):
     return sim
 
 def run_model(swt):
-    swt.write_simulation()
-    success, buff = swt.run_simulation(silent=False)
+    swt.write_simulation(silent=True)
+    success, buff = swt.run_simulation(silent=True)
     if not success:
             print(buff)
 
@@ -775,3 +775,57 @@ def get_all_conc(name):
         conc.append(gwt.output.concentration().get_data(totim=time))
   
     return conc
+
+def run_modpath_modern(params):
+
+    name, interface = params
+    porosity = 0.5
+    ws = f"model_files/{name}"
+    sim = flopy.mf6.MFSimulation.load(
+        sim_ws=ws,
+        exe_name="/home/superuser/mf6",
+        verbosity_level=0,
+    )
+    gwf = sim.get_model(name)
+
+
+    mp = flopy.modpath.Modpath7(
+        modelname=f"{name}",
+        flowmodel=gwf,
+        exe_name="/home/superuser/mp7",
+        model_ws=ws,
+    )
+    mpbas = flopy.modpath.Modpath7Bas(mp, porosity=0.5)
+
+    particle_list = []
+    for row, col in enumerate(interface):
+        for lay in range(8, 16):
+            particle_list.append((lay, row, col))
+
+    mp7_particle_data = flopy.modpath.ParticleData(
+        particle_list,
+        structured=True,
+        particleids=[i for i in range(len(particle_list))],
+    )
+
+    pg = flopy.modpath.ParticleGroup(
+        particlegroupname="PG",
+        particledata=mp7_particle_data,
+        filename=f"{name}" + "pg.sloc")
+
+    mpsim = flopy.modpath.Modpath7Sim(
+        mp,
+        pathlinefilename=f"{name}.path",
+        simulationtype="pathline",
+        trackingdirection="forward",
+        weaksinkoption="pass_through",
+        weaksourceoption="pass_through",
+        budgetoutputoption="summary",
+        particlegroups=[pg],
+        stoptimeoption='total'
+    )
+
+    mp.write_input()
+    mp.run_model(silent=False, report=True)
+
+    print("all good")
