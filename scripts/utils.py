@@ -49,7 +49,7 @@ def collate_steady_interface_cells(name):
 def collate_transient_results(name, n):
     results = []
     finished_index = []
-    for idx, real in enumerate([f"{name}{i}_" for i in range(n)]):
+    for idx, real in enumerate([f"{name}{i}_t" for i in range(n)]):
         conc, _, _, _, _ = modelling.get_last_results(real) 
         if conc is not None:
             finished_index.append(idx)
@@ -129,6 +129,17 @@ def find_steady_description(name):
 def find_metrics_over_time_2D():
     pass
 
+def collate_pathline_data(name):
+    index = np.load(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_index.npy')
+    results = []
+    for idx in index:
+        file = f"/home/superuser/objective_2/model_files/{name}{idx}_t/{name}{idx}_t_mp.mppth"
+        p = flopy.utils.PathlineFile(file)
+        results.append(p.get_alldata())
+
+    np.save(f'/home/superuser/objective_2/collated_outputs/{name}_t_pathlines.npy', results)
+
+
 def get_n_best(name, nplot):
     """
     Function to get the n best runs from a dreamz output
@@ -156,4 +167,5 @@ if __name__=="__main__":
     # find_metrics_over_time('heta03Dc')
     # find_steady_description('heta03Dc')
     # collate_shoreline_salinity('heta03Dc')
-    collate_steady_interface_cells('heta03Dc')
+    # collate_steady_interface_cells('heta03Dc')
+    collate_transient_results('heta03Dc', 30)
