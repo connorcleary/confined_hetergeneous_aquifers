@@ -59,7 +59,6 @@ def run_modpath_for_all_modern(name):
         real_name = f"{name}{i}_"
         interface = interfaces[np.argwhere(s_index == i)[0][0]]
         runs.append([real_name, interface])
-
     # p = Pool(processes=4)
     # p.map(modelling.run_modpath_modern, runs)
     modelling.run_modpath_modern(runs[1])
