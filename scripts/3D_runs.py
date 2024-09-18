@@ -5,7 +5,6 @@ import numpy as np
 
 from scripts.utils import collate_transient_results
 
-
 def test_one_model(inputs):
     name, field_name = inputs
     sim = modelling.build_base_model(name, field_name)
@@ -40,7 +39,7 @@ def build_and_run_modern(name, n):
 
     inputs = []
     for i in range(n):
-    # if i not in ran:
+        # if i not in ran:
         inputs.append([f"{name}{i}", f"TSim_Out{i+1}"])
 
     p=Pool(processes=12)
@@ -59,12 +58,12 @@ def run_modpath_for_all_modern(name):
     runs = []
 
     for i in t_index:
-        real_name = f"{name}{i}_short"
+        real_name = f"{name}{i}_t"
         interface = interfaces[np.argwhere(s_index == i)[0][0]]
         runs.append([real_name, interface])
-    # p = Pool(processes=4)
-    # p.map(modelling.run_modpath_modern, runs)
-    modelling.run_modpath_modern(runs[1])
+    p = Pool(processes=16)
+    p.map(modelling.run_modpath_modern, runs)
+    # modelling.run_modpath_modern(runs[1])
 
 if __name__ == "__main__":
     # build_and_run_base_models("heta03Dc", 30)
@@ -73,7 +72,7 @@ if __name__ == "__main__":
     # plots.plot_3D_plume("heta03Dc1")
     # plots.results_1("heta03Dc", 30)
     # plots.results_2("heta03Dc", 10)
-    build_and_run_modern("heta03Dc", 30)
+    # build_and_run_modern("heta03Dc", 30)
     # plots.results_3("heta03Dfine", 10)
-    # run_modpath_for_all_modern("heta03Dc")
+    run_modpath_for_all_modern("heta03Dc")
     # collate_transient_results("heta03Dc", 30)

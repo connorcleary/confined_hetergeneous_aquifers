@@ -40,11 +40,11 @@ def log_likelihood_dispersive(params):
 
 
 def log_likelihood_dual(params):
-    k, volfrac, zeta_im = params
+    k, volfrac, zeta_im, anis = params
     with tempfile.TemporaryDirectory() as tdir:
         tdir = Path(tdir)
-        base_params = {'ka': k**2}
-        transport_kwargs = {'alpha': 0.01, 'porosity_im': 0.5, 'volfrac': volfrac**2, 'zetaim': zeta_im**2}
+        base_params = {'ka': 10**k, 'anis': 10**anis}
+        transport_kwargs = {'alpha': 0.01, 'porosity_im': 0.5, 'volfrac': 10**volfrac, 'zetaim': 10**zeta_im}
         swt = simple_modelling.build_2D_steady_model(tdir,'temp', 'dual porosity', base_params, transport_kwargs)
         modelling.run_model(swt)
 
@@ -81,20 +81,22 @@ def generate_priors(name, type, plot=False):
         ka = SampledParam(norm, loc=1.3, scale=0.4)
         volfrac = SampledParam(uniform, loc=-3, scale=2.4)
         zeta_im = SampledParam(uniform, loc=-4, scale=3) # from Bianchi and Zheng (2016)
+        anis = SampledParam(uniform, loc=0, scale=2)
         priors['ka'] = ka
         priors["volfrac"] = volfrac
         priors["zeta_im"] = zeta_im
-        units = ["m/day", "-", "1/day"]
-        types = ['norm', 'uniform', 'uniform']
+        priors["anis"] = anis
+        units = ["m/day", "-", "1/day", "-"]
+        types = ['norm', 'uniform', 'uniform', 'uniform']
 
     if plot:
-        plots.plot_priors(type, priors, units, types)
+        plots.plot_priors(name, priors, units, types)
         plot_posteriors(name, 0.5, priors, units, types)
 
     return priors
 
 def calibrate_steady_state(name, type='dispersive'):
-    params = generate_priors(type=type)
+    params = generate_priors(name, type=type)
     model_name = Path('./dreamz_outputs')
     model_name.mkdir(exist_ok=True)
     model_name = model_name.joinpath(name)
@@ -110,8 +112,8 @@ def calibrate_steady_state(name, type='dispersive'):
         # collate and move results
 
     if type == 'dual porosity':
-        params = [params["ka"], params["volfrac"], params["zeta_im"]]
-        sampled_params, log_ps = run_dream(likelihood=log_likelihood_dual, parameters=params, nchains=8,
+        params = [params["ka"], params["volfrac"], params["zeta_im"], params["anis"]]
+        sampled_params, log_ps = run_dream(likelihood=log_likelihood_dual, parameters=params, nchains=16,
                                            niterations=100, model_name=f"{str(model_name)}/")
         np.save(f"{model_name}/sampled_params.npy", sampled_params)
         np.save(f"{model_name}/log_ps.npy", log_ps)
@@ -127,19 +129,20 @@ def test_steady_realization(type="dispersive"):
         modelling.run_model(swt)
 
     elif type == "dual porosity":
-        priors = generate_priors("dual porosity", plot=False)
-        base_params = {'ka': 20}
+        priors = generate_priors("dual_s", "dual porosity", plot=False)
+        base_params = {'ka': 10**1.5, 'anis': 100}
         transport_kwargs = {'alpha': 0.01, 'porosity_im':0.5, 'volfrac':0.1, 'zetaim':0.005}
-        swt = simple_modelling.build_2D_steady_model('dual_s', 'dual porosity', base_params, transport_kwargs)
+        swt = simple_modelling.build_2D_steady_model('test', 'dual_s', 'dual porosity', base_params, transport_kwargs)
         modelling.run_model(swt)
 
 
 
 if __name__ == "__main__":
-    generate_priors(name='test_dispersive', type="dispersive", plot=True)
-    generate_priors(name='test_dual', type="dual porosity", plot=True)
-    # test_steady_realization('dispersive')
-    # plots.plot_2D_model_steady('dispersive_l')
+    # generate_priors(name='test_dispersive', type="dispersive", plot=True)
+    #
+    test_steady_realization('dual porosity')
+    plots.plot_2D_model_steady('dual_s')
     # calibrate_steady_state("test_dispersive", type="dispersive")
     # calibrate_steady_state("test_dual", type="dual porosity")
     # log_likelihood_dispersive([10, 10])
+    # generate_priors(name='test_dual', type="dual porosity", plot=True)

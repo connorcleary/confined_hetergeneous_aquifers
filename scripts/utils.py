@@ -67,7 +67,7 @@ def find_metrics_over_time(name):
     for idx in finished_index:
 
         conc0 = modelling.get_last_results(f'{name}{idx}')[0]
-        conc = modelling.get_all_conc(f'{name}{idx}_')
+        conc = modelling.get_all_conc(f'{name}{idx}_t')
         temp_max = [proc.find_max_toe_position(conc0, delc, x_onshore)]
         temp_ave = [proc.find_average_toe_position(conc0, delc, x_onshore)]
         temp_width = [proc.find_average_width(conc0, delc, ncol, x_onshore)]
@@ -85,18 +85,37 @@ def find_metrics_over_time(name):
     np.save(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_average_toe.npy', average_toe)
     np.save(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_average_width.npy', average_width)
 
+def find_velocity_over_time(name):
+    finished_index = np.load(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_index.npy')
+    velocity = []
+    t = [i * 3600 / 365 for i in range(11)] + [100]
+
+    for idx in finished_index:
+
+        conc0 = modelling.get_last_results(f'{name}{idx}')[0]
+        conc = modelling.get_all_conc(f'{name}{idx}_t')
+        interfaces = [[-x_onshore + delc*np.min(np.argmax([conc0[:, row, :] >= 0.35], axis=2)) for row in range(conc0.shape[1])]]
+        for conc_t in conc:
+            interfaces.append([-x_onshore + delc*np.min(np.argmax([conc_t[:, row, :] >= 0.35], axis=2)) for row in range(conc_t.shape[1])])
+        interfaces = np.asarray(interfaces)
+        diff = np.diff(interfaces, axis=0)
+        velocity.append(np.divide(diff.T, np.diff(t)))
+
+    np.save(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_velocity.npy', velocity)
+
+
 def collate_shoreline_salinity(name):
     finished_index = np.load(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_index.npy')
     results = []
     for idx in finished_index:
         conc0 = modelling.get_last_results(f'{name}{idx}')[0]
-        conc = modelling.get_all_conc(f'{name}{idx}_')
+        conc = modelling.get_all_conc(f'{name}{idx}_t')
         conc = np.asarray(conc)
-        all_conc = np.concatenate(([conc0], conc), axis=0)[:, :, :, 2]
+        all_conc = np.concatenate(([conc0], conc), axis=0)[:, :, :, int(400/12.5)]
         all_conc = np.max(all_conc, axis=1)
         results.append(all_conc)
 
-    np.save(f'/home/superuser/objective_2/collated_outputs/{name}_average_shoreline_conc5.npy', results)
+    np.save(f'/home/superuser/objective_2/collated_outputs/{name}_average_shoreline_conc.npy', results)
 
 
 def find_effective_conductivities(name):
@@ -132,13 +151,34 @@ def find_metrics_over_time_2D():
 def collate_pathline_data(name):
     index = np.load(f'/home/superuser/objective_2/collated_outputs/{name}_transient_collated_index.npy')
     results = []
+    # aquifer only
+    # one particle in upper and lower layer
+    # 20 particles in total
+    rows = np.linspace(0, 79, 40)
+
+    particles = []
+    for i, row in enumerate(rows):
+        if i%2 == 0:
+            particles.append(int(row*8+2))
+        if i%2 == 1:
+            particles.append(int(row*8+6))
+
     for idx in index:
+        result = []
         file = f"/home/superuser/objective_2/model_files/{name}{idx}_t/{name}{idx}_t_mp.mppth"
-        p = flopy.utils.PathlineFile(file)
-        results.append(p.get_alldata())
+        try:
+            p = flopy.utils.PathlineFile(file)
+            rec_array = p.get_alldata()
+            for particle in particles:
+                ts = []
+                for step in rec_array[particle]:
+                    ts.append([step[0], step[1]])
+                result.append(ts)
+            results.append(result)
+        except:
+            results.append(None)
 
-    np.save(f'/home/superuser/objective_2/collated_outputs/{name}_t_pathlines.npy', results)
-
+    return results
 
 def get_n_best(name, nplot):
     """
@@ -160,6 +200,7 @@ def get_n_best(name, nplot):
 
 
 if __name__=="__main__":
+    pass
     # collate_transient_results('heta03Dc', 30)
     # find_effective_conductivities('heta03Dc')
    # find_toe_position_over_time
@@ -168,4 +209,6 @@ if __name__=="__main__":
     # find_steady_description('heta03Dc')
     # collate_shoreline_salinity('heta03Dc')
     # collate_steady_interface_cells('heta03Dc')
-    collate_transient_results('heta03Dc', 30)
+    #collate_transient_results('heta03Dc', 30)
+    # collate_pathline_data('heta03Dc')
+    find_velocity_over_time('heta03Dc')
